@@ -3,17 +3,19 @@ package com.app.ecom.service;
 import com.app.ecom.dto.AddressDTO;
 import com.app.ecom.dto.UserRequest;
 import com.app.ecom.dto.UserResponse;
+import com.app.ecom.exception.ResourceNotFoundException;
 import com.app.ecom.model.Address;
 import com.app.ecom.repository.UserRepository;
 import com.app.ecom.model.User;
 import jakarta.transaction.Transactional;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 public class UserService {
     private final UserRepository userRepository;
 
@@ -22,30 +24,35 @@ public class UserService {
     }
 
     public List<UserResponse> fetchAllUsers() {
+        log.info("Fetching all users from database");
         return userRepository.findAll().stream()
                 .map(this::mapToUserResponse)
                 .collect(Collectors.toList());
     }
 
     public void addUser(UserRequest userRequest) {
+        log.info("Creating user for email={}", userRequest.getEmail());
         User user = new User();
         updateUserFromRequest(user, userRequest);
         userRepository.save(user);
+        log.info("User persisted for email={}", userRequest.getEmail());
     }
 
-    public Optional<UserResponse> getUserById(Long id) {
+    public UserResponse getUserById(Long id) {
+        log.info("Fetching user by id={}", id);
         return userRepository.findById(id)
-                .map(this::mapToUserResponse);
+                .map(this::mapToUserResponse)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
     }
 
     @Transactional
-    public boolean updateUser(Long userId, UserRequest updatedUser) {
-        return userRepository.findById(userId)
-                .map(existingUser -> {
-                    updateUserFromRequest(existingUser, updatedUser);
-                    userRepository.save(existingUser);
-                    return true;
-                }).orElse(false);
+    public void updateUser(Long userId, UserRequest updatedUser) {
+        log.info("Updating user by id={}", userId);
+        User existingUser = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+        updateUserFromRequest(existingUser, updatedUser);
+        userRepository.save(existingUser);
+        log.info("User updated in database for id={}", userId);
     }
 
     private void updateUserFromRequest(User user, UserRequest userRequest) {

@@ -1,13 +1,13 @@
 package com.app.ecom.dto;
 
-import com.app.ecom.model.Product;
 import lombok.Data;
 
 import java.math.BigDecimal;
 
 @Data
-public class CartItemResponse {
-    private Product product;
+public class OrderItemDTO {
+    private Long id;
+    private Long productId;
     private Integer quantity;
     private BigDecimal price;
 }

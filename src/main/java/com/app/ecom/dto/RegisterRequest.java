@@ -1,4 +1,5 @@
 package com.app.ecom.dto;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -7,7 +8,7 @@ import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 
 @Data
-public class UserRequest {
+public class RegisterRequest {
 
     @NotBlank(message = "First name is required")
     private String firstName;
@@ -25,7 +26,11 @@ public class UserRequest {
     )
     private String phone;
 
+    @NotBlank(message = "Password is required")
+    private String password;
+
     @NotNull(message = "Address is required")
     @Valid
     private AddressDTO address;
 }
+

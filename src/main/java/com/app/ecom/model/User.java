@@ -21,6 +21,7 @@ public class User {
     private String lastName;
     private String email;
     private String phone;
+    private String password;
     private UserRole role = UserRole.CUSTOMER;
 
     @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true)

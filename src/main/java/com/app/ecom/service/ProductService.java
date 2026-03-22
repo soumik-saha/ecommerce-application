@@ -2,9 +2,14 @@ package com.app.ecom.service;
 
 import com.app.ecom.dto.ProductRequest;
 import com.app.ecom.dto.ProductResponse;
+import com.app.ecom.exception.ResourceNotFoundException;
 import com.app.ecom.model.Product;
 import com.app.ecom.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -12,14 +17,17 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ProductService {
 
     private final ProductRepository productRepository;
 
     public ProductResponse createProduct(ProductRequest productRequest) {
+        log.info("Creating product with name={}", productRequest.getName());
         Product product = new Product();
         updateProductFromRequest(product, productRequest);
         Product savedProduct = productRepository.save(product);
+        log.info("Product created with id={}", savedProduct.getId());
         return mapToProductResponse(savedProduct);
     }
 
@@ -46,6 +54,7 @@ public class ProductService {
     }
 
     public List<ProductResponse> getAllProducts() {
+        log.info("Fetching all active products");
         List<Product> products = productRepository.findByActiveTrue();
         List<ProductResponse> productResponseList = new ArrayList<>();
         for(Product product : products) {
@@ -55,40 +64,36 @@ public class ProductService {
         return productResponseList;
     }
 
-    public ProductResponse getProductById(Long id) {
-        Product product = productRepository.findById(id).get();
-        ProductResponse productResponse = new ProductResponse();
-        productResponse.setId(product.getId());
-        productResponse.setName(product.getName());
-        productResponse.setDescription(product.getDescription());
-        productResponse.setImageUrl(product.getImageUrl());
-        productResponse.setPrice(product.getPrice());
-        productResponse.setCategory(product.getCategory());
-        productResponse.setStockQuantity(product.getStockQuantity());
-        productResponse.setActive(product.getActive());
-        return productResponse;
+    public Product getProductById(Long id) {
+        log.info("Fetching product by id={}", id);
+        return productRepository.findByIdAndActiveTrue(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
     }
 
-    public boolean updateProduct(Long id, ProductRequest productRequest) {
-        return productRepository.findById(id)
-                .map(existingProduct -> {
-                    updateProductFromRequest(existingProduct, productRequest);
-                    productRepository.save(existingProduct);
-                    return true;
-                }).orElse(false);
+    public ProductResponse getProductResponseById(Long id) {
+        return mapToProductResponse(getProductById(id));
     }
 
-    public Boolean deleteProduct(Long id) {
-        if(productRepository.findById(id).isPresent()) {
-            Product product = productRepository.findById(id).get();
-            product.setActive(false);
-            productRepository.save(product);
-            return true;
-        }
-        return false;
+    public void updateProduct(Long id, ProductRequest productRequest) {
+        log.info("Updating product by id={}", id);
+        Product existingProduct = productRepository.findByIdAndActiveTrue(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
+        updateProductFromRequest(existingProduct, productRequest);
+        productRepository.save(existingProduct);
+        log.info("Product updated in database for id={}", id);
+    }
+
+    public void deleteProduct(Long id) {
+        log.info("Soft deleting product by id={}", id);
+        Product product = productRepository.findByIdAndActiveTrue(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
+        product.setActive(false);
+        productRepository.save(product);
+        log.info("Product soft deleted for id={}", id);
     }
 
     public List<ProductResponse> searchProducts(String keyword) {
+        log.info("Searching products with keyword='{}'", keyword);
         List<Product> productList = productRepository.searchProducts(keyword);
         List<ProductResponse> productResponseList = new ArrayList<>();
         for(Product product : productList) {
@@ -96,5 +101,13 @@ public class ProductService {
             productResponseList.add(productResponse);
         }
         return productResponseList;
+    }
+
+    public Page<ProductResponse> getProducts(String keyword, int page, int size) {
+        String safeKeyword = keyword == null ? "" : keyword.trim();
+        log.info("Fetching paged products with keyword='{}', page={}, size={}", safeKeyword, page, size);
+        PageRequest pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        return productRepository.searchActiveProducts(safeKeyword, pageable)
+                .map(this::mapToProductResponse);
     }
 }
