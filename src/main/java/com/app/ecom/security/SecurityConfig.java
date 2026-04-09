@@ -35,14 +35,21 @@ public class SecurityConfig {
                         .accessDeniedHandler(jwtAccessDeniedHandler)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/register", "/api/auth/register/admin", "/api/auth/login", "/h2-console/**").permitAll()
+                        .requestMatchers("/api/auth/register", "/api/auth/register/admin",
+                                "/api/auth/login", "/api/auth/refresh",
+                                "/h2-console/**",
+                                "/swagger-ui/**", "/swagger-ui.html",
+                                "/v3/api-docs/**").permitAll()
                         .requestMatchers("/api/auth/logout").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/reviews/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/products/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/products/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/products/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/orders/**").hasRole("ADMIN")
-                        .requestMatchers("/api/orders/**", "/api/cart/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/orders").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/orders/**").hasRole("ADMIN")
+                        .requestMatchers("/api/orders/**", "/api/cart/**",
+                                "/api/payments/**", "/api/reviews/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

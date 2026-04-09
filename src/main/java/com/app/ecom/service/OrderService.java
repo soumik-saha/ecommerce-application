@@ -3,6 +3,8 @@ package com.app.ecom.service;
 import com.app.ecom.dto.CartItemResponse;
 import com.app.ecom.dto.OrderItemDTO;
 import com.app.ecom.dto.OrderResponse;
+import com.app.ecom.dto.OrderStatusUpdateRequest;
+import com.app.ecom.exception.ResourceNotFoundException;
 import com.app.ecom.model.Order;
 import com.app.ecom.model.OrderItem;
 import com.app.ecom.model.OrderStatus;
@@ -11,6 +13,7 @@ import com.app.ecom.repository.OrderRepository;
 import com.app.ecom.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -86,8 +89,48 @@ public class OrderService {
                 )
         );
 
+        // Fire-and-forget notification (async, non-blocking)
+        sendOrderConfirmationAsync(savedOrder.getId(), user.getEmail());
+
         // Build Response
         return mapToResponse(savedOrder);
+    }
+
+    /**
+     * Asynchronously sends an order confirmation notification.
+     * This runs in a separate thread so the API response is not delayed.
+     */
+    @Async("notificationExecutor")
+    public void sendOrderConfirmationAsync(Long orderId, String email) {
+        log.info("Sending order confirmation for orderId={} to email={}", orderId, email);
+        // TODO: integrate with email/notification service (e.g. SendGrid, SES)
+    }
+
+    @Transactional(readOnly = true)
+    public List<OrderResponse> getAllOrders() {
+        log.info("Fetching all orders");
+        return orderRepository.findAll().stream()
+                .map(this::mapToOrderResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<OrderResponse> getOrdersByUser(Long userId) {
+        log.info("Fetching orders for userId={}", userId);
+        return orderRepository.findByUserId(userId).stream()
+                .map(this::mapToOrderResponse)
+                .toList();
+    }
+
+    @Transactional
+    public OrderResponse updateOrderStatus(Long orderId, OrderStatusUpdateRequest request) {
+        log.info("Updating status for orderId={} to {}", orderId, request.getStatus());
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
+        order.setOrderStatus(request.getStatus());
+        Order saved = orderRepository.save(order);
+        log.info("Order status updated for orderId={} to {}", orderId, saved.getOrderStatus());
+        return mapToOrderResponse(saved);
     }
 
     private OrderResponse mapToResponse(Order order) {
@@ -111,14 +154,6 @@ public class OrderService {
         response.setStatus(order.getOrderStatus());
 
         return response;
-    }
-
-    @Transactional(readOnly = true)
-    public List<OrderResponse> getAllOrders() {
-        log.info("Fetching all orders");
-        return orderRepository.findAll().stream()
-                .map(this::mapToOrderResponse)
-                .toList();
     }
 
     public OrderResponse mapToOrderResponse(Order order) {

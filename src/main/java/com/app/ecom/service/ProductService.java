@@ -7,6 +7,9 @@ import com.app.ecom.model.Product;
 import com.app.ecom.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -22,6 +25,7 @@ public class ProductService {
 
     private final ProductRepository productRepository;
 
+    @CacheEvict(value = {"products", "productSearch"}, allEntries = true)
     public ProductResponse createProduct(ProductRequest productRequest) {
         log.info("Creating product with name={}", productRequest.getName());
         Product product = new Product();
@@ -64,6 +68,7 @@ public class ProductService {
         return productResponseList;
     }
 
+    @Cacheable(value = "products", key = "#id")
     public Product getProductById(Long id) {
         log.info("Fetching product by id={}", id);
         return productRepository.findByIdAndActiveTrue(id)
@@ -74,6 +79,10 @@ public class ProductService {
         return mapToProductResponse(getProductById(id));
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "products", key = "#id"),
+            @CacheEvict(value = "productSearch", allEntries = true)
+    })
     public void updateProduct(Long id, ProductRequest productRequest) {
         log.info("Updating product by id={}", id);
         Product existingProduct = productRepository.findByIdAndActiveTrue(id)
@@ -83,6 +92,10 @@ public class ProductService {
         log.info("Product updated in database for id={}", id);
     }
 
+    @Caching(evict = {
+            @CacheEvict(value = "products", key = "#id"),
+            @CacheEvict(value = "productSearch", allEntries = true)
+    })
     public void deleteProduct(Long id) {
         log.info("Soft deleting product by id={}", id);
         Product product = productRepository.findByIdAndActiveTrue(id)
@@ -92,6 +105,7 @@ public class ProductService {
         log.info("Product soft deleted for id={}", id);
     }
 
+    @Cacheable(value = "productSearch", key = "#keyword")
     public List<ProductResponse> searchProducts(String keyword) {
         log.info("Searching products with keyword='{}'", keyword);
         List<Product> productList = productRepository.searchProducts(keyword);

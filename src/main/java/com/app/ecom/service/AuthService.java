@@ -2,11 +2,13 @@ package com.app.ecom.service;
 
 import com.app.ecom.dto.AuthRequest;
 import com.app.ecom.dto.AuthResponse;
-import com.app.ecom.dto.RegisterRequest;
+import com.app.ecom.dto.RefreshTokenRequest;
 import com.app.ecom.model.Address;
+import com.app.ecom.model.RefreshToken;
 import com.app.ecom.model.User;
 import com.app.ecom.model.UserRole;
 import com.app.ecom.repository.UserRepository;
+import com.app.ecom.dto.RegisterRequest;
 import com.app.ecom.security.AppUserDetails;
 import com.app.ecom.security.JwtService;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +20,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +31,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
+    private final RefreshTokenService refreshTokenService;
 
     @Value("${app.auth.admin-registration-secret}")
     private String adminRegistrationSecret;
@@ -47,9 +51,10 @@ public class AuthService {
         return registerWithRole(request, UserRole.ADMIN);
     }
 
-    public void logout() {
-        // JWT auth is stateless; clients should discard the token after logout.
-        log.info("Logout acknowledged for stateless JWT session");
+    @Transactional
+    public void logout(User user) {
+        refreshTokenService.revokeAllForUser(user);
+        log.info("Logout completed for userId={}", user.getId());
     }
 
     private AuthResponse registerWithRole(RegisterRequest request, UserRole role) {
@@ -77,9 +82,10 @@ public class AuthService {
         User saved = userRepository.save(user);
         log.info("User account created with id={}, role={}", saved.getId(), saved.getRole());
         AppUserDetails userDetails = new AppUserDetails(saved);
-        String token = jwtService.generateToken(userDetails);
+        String accessToken = jwtService.generateToken(userDetails);
+        String refreshToken = refreshTokenService.createRefreshToken(saved).getToken();
 
-        return new AuthResponse(token, "Bearer", saved.getId(), saved.getEmail(), saved.getRole().name());
+        return new AuthResponse(accessToken, refreshToken, "Bearer", saved.getId(), saved.getEmail(), saved.getRole().name());
     }
 
     public AuthResponse login(AuthRequest request) {
@@ -90,10 +96,15 @@ public class AuthService {
             );
 
             AppUserDetails userDetails = (AppUserDetails) authentication.getPrincipal();
-            String token = jwtService.generateToken(userDetails);
+            String accessToken = jwtService.generateToken(userDetails);
+
+            User user = userRepository.findById(userDetails.getId())
+                    .orElseThrow(() -> new IllegalStateException("Authenticated user not found"));
+            String refreshToken = refreshTokenService.createRefreshToken(user).getToken();
 
             return new AuthResponse(
-                    token,
+                    accessToken,
+                    refreshToken,
                     "Bearer",
                     userDetails.getId(),
                     userDetails.getEmail(),
@@ -103,6 +114,20 @@ public class AuthService {
             log.warn("Login failed for email={}", request.getEmail());
             throw new IllegalArgumentException("Invalid email or password");
         }
+    }
+
+    @Transactional
+    public AuthResponse refreshAccessToken(RefreshTokenRequest request) {
+        RefreshToken refreshToken = refreshTokenService.findByToken(request.getRefreshToken());
+        refreshTokenService.verifyExpiration(refreshToken);
+
+        User user = refreshToken.getUser();
+        AppUserDetails userDetails = new AppUserDetails(user);
+        String newAccessToken = jwtService.generateToken(userDetails);
+
+        log.info("Access token refreshed for userId={}", user.getId());
+        return new AuthResponse(newAccessToken, refreshToken.getToken(), "Bearer",
+                user.getId(), user.getEmail(), user.getRole().name());
     }
 }
 
