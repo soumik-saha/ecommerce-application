@@ -1,6 +1,8 @@
 package com.app.ecom.exception;
 
 import com.app.ecom.api.ApiErrorResponse;
+import com.app.ecom.exception.InsufficientStockException;
+import com.app.ecom.exception.TokenRefreshException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -140,6 +142,36 @@ public class GlobalExceptionHandler {
                 null
         );
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+    }
+
+    @ExceptionHandler(InsufficientStockException.class)
+    public ResponseEntity<ApiErrorResponse> handleInsufficientStock(InsufficientStockException ex,
+                                                                    HttpServletRequest request) {
+        log.warn("Insufficient stock for path='{}': {}", request.getRequestURI(), ex.getMessage());
+        ApiErrorResponse response = new ApiErrorResponse(
+                Instant.now(),
+                HttpStatus.CONFLICT.value(),
+                HttpStatus.CONFLICT.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                null
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    @ExceptionHandler(TokenRefreshException.class)
+    public ResponseEntity<ApiErrorResponse> handleTokenRefresh(TokenRefreshException ex,
+                                                               HttpServletRequest request) {
+        log.warn("Token refresh error for path='{}': {}", request.getRequestURI(), ex.getMessage());
+        ApiErrorResponse response = new ApiErrorResponse(
+                Instant.now(),
+                HttpStatus.UNAUTHORIZED.value(),
+                HttpStatus.UNAUTHORIZED.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                null
+        );
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
     }
 
     @ExceptionHandler(Exception.class)

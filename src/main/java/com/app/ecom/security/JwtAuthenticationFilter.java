@@ -77,7 +77,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (pathMatcher.match("/api/auth/register", uri)
                 || pathMatcher.match("/api/auth/register/admin", uri)
                 || pathMatcher.match("/api/auth/login", uri)
-                || pathMatcher.match("/h2-console/**", uri)) {
+                || pathMatcher.match("/api/auth/refresh", uri)
+                || pathMatcher.match("/h2-console/**", uri)
+                || pathMatcher.match("/swagger-ui/**", uri)
+                || pathMatcher.match("/v3/api-docs/**", uri)) {
             return true;
         }
 

@@ -2,13 +2,18 @@ package com.app.ecom.controller;
 
 import com.app.ecom.dto.AuthRequest;
 import com.app.ecom.dto.AuthResponse;
+import com.app.ecom.dto.RefreshTokenRequest;
 import com.app.ecom.dto.RegisterRequest;
+import com.app.ecom.model.User;
+import com.app.ecom.repository.UserRepository;
+import com.app.ecom.security.AppUserDetails;
 import com.app.ecom.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -20,6 +25,7 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+    private final UserRepository userRepository;
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
@@ -42,10 +48,18 @@ public class AuthController {
         return ResponseEntity.ok(authService.login(request));
     }
 
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        log.info("Token refresh request received");
+        return ResponseEntity.ok(authService.refreshAccessToken(request));
+    }
+
     @PostMapping("/logout")
-    public ResponseEntity<Map<String, String>> logout() {
-        log.info("Logout request received");
-        authService.logout();
+    public ResponseEntity<Map<String, String>> logout(@AuthenticationPrincipal AppUserDetails currentUser) {
+        log.info("Logout request received for userId={}", currentUser.getId());
+        User user = userRepository.findById(currentUser.getId())
+                .orElseThrow(() -> new IllegalStateException("User not found"));
+        authService.logout(user);
         return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
 }
