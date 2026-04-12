@@ -103,3 +103,9 @@ Expected: `200 OK` with `successCount`, `duplicateCount`, and `failureCount`.
 
 Expected: `200 OK` with a CSV file download (`Content-Disposition: attachment; filename=audit-logs.csv`).
 
+## Render port note
+
+- The app reads port in this order: `PORT` -> `SERVER_PORT` -> `8081`.
+- On Render, keep `PORT` managed by Render and set `SPRING_PROFILES_ACTIVE=production`.
+- For local Docker Compose, `PORT=8081` and `SERVER_PORT=8081` are already set.
+
