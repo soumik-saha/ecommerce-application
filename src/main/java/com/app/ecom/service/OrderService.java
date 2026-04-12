@@ -8,8 +8,10 @@ import com.app.ecom.exception.ResourceNotFoundException;
 import com.app.ecom.model.Order;
 import com.app.ecom.model.OrderItem;
 import com.app.ecom.model.OrderStatus;
+import com.app.ecom.model.Product;
 import com.app.ecom.model.User;
 import com.app.ecom.repository.OrderRepository;
+import com.app.ecom.repository.ProductRepository;
 import com.app.ecom.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +31,7 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final CartService cartService;
     private final UserRepository userRepository;
+    private final ProductRepository productRepository;
 
     @Transactional
     public OrderResponse createOrder(Long userId) {
@@ -65,8 +68,13 @@ public class OrderService {
 
             totalAmount = totalAmount.add(itemTotal);
 
+            Long productId = cartItem.getProduct().getId();
+            // Always attach a managed Product instance in this transaction.
+            Product managedProduct = productRepository.findByIdAndActiveTrue(productId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
+
             OrderItem orderItem = new OrderItem();
-            orderItem.setProduct(cartItem.getProduct());
+            orderItem.setProduct(managedProduct);
             orderItem.setQuantity(cartItem.getQuantity());
             orderItem.setPrice(cartItem.getPrice());
             orderItem.setOrder(order);   // owning side

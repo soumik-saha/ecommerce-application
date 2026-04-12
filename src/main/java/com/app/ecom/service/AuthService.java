@@ -22,6 +22,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -35,6 +37,9 @@ public class AuthService {
 
     @Value("${app.auth.admin-registration-secret}")
     private String adminRegistrationSecret;
+
+    @Value("${app.jwt.expiration-ms}")
+    private long accessTokenExpirationMs;
 
     public AuthResponse register(RegisterRequest request) {
         log.info("Registering customer account for email={}", request.getEmail());
@@ -83,9 +88,18 @@ public class AuthService {
         log.info("User account created with id={}, role={}", saved.getId(), saved.getRole());
         AppUserDetails userDetails = new AppUserDetails(saved);
         String accessToken = jwtService.generateToken(userDetails);
-        String refreshToken = refreshTokenService.createRefreshToken(saved).getToken();
+        RefreshToken refreshToken = refreshTokenService.createRefreshToken(saved);
 
-        return new AuthResponse(accessToken, refreshToken, "Bearer", saved.getId(), saved.getEmail(), saved.getRole().name());
+        return new AuthResponse(
+                accessToken,
+                refreshToken.getToken(),
+                "Bearer",
+                saved.getId(),
+                saved.getEmail(),
+                saved.getRole().name(),
+                Instant.now().plusMillis(accessTokenExpirationMs),
+                refreshToken.getExpiryDate()
+        );
     }
 
     public AuthResponse login(AuthRequest request) {
@@ -100,15 +114,17 @@ public class AuthService {
 
             User user = userRepository.findById(userDetails.getId())
                     .orElseThrow(() -> new IllegalStateException("Authenticated user not found"));
-            String refreshToken = refreshTokenService.createRefreshToken(user).getToken();
+            RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
 
             return new AuthResponse(
                     accessToken,
-                    refreshToken,
+                    refreshToken.getToken(),
                     "Bearer",
                     userDetails.getId(),
                     userDetails.getEmail(),
-                    userDetails.getRole()
+                    userDetails.getRole(),
+                    Instant.now().plusMillis(accessTokenExpirationMs),
+                    refreshToken.getExpiryDate()
             );
         } catch (BadCredentialsException ex) {
             log.warn("Login failed for email={}", request.getEmail());
@@ -126,8 +142,16 @@ public class AuthService {
         String newAccessToken = jwtService.generateToken(userDetails);
 
         log.info("Access token refreshed for userId={}", user.getId());
-        return new AuthResponse(newAccessToken, refreshToken.getToken(), "Bearer",
-                user.getId(), user.getEmail(), user.getRole().name());
+        return new AuthResponse(
+                newAccessToken,
+                refreshToken.getToken(),
+                "Bearer",
+                user.getId(),
+                user.getEmail(),
+                user.getRole().name(),
+                Instant.now().plusMillis(accessTokenExpirationMs),
+                refreshToken.getExpiryDate()
+        );
     }
 }
 

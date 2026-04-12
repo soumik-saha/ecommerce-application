@@ -19,6 +19,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -170,6 +172,52 @@ class ApiEndpointsIntegrationTest {
         mockMvc.perform(get("/api/orders")
                         .header("Authorization", "Bearer " + admin.token()))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void auditLogBulkEndpointsAreCovered() throws Exception {
+        UserSession admin = registerAndLoginAdmin();
+
+        String idempotencyKey = "audit-" + UUID.randomUUID();
+        String payload = "{" +
+                "\"logs\":[" +
+                "{" +
+                "\"entityType\":\"PRODUCT\"," +
+                "\"entityId\":1," +
+                "\"action\":\"UPDATE\"," +
+                "\"description\":\"Updated product price\"," +
+                "\"oldValue\":\"999.00\"," +
+                "\"newValue\":\"1299.00\"," +
+                "\"idempotencyKey\":\"" + idempotencyKey + "\"" +
+                "}," +
+                "{" +
+                "\"entityType\":\"PRODUCT\"," +
+                "\"entityId\":1," +
+                "\"action\":\"UPDATE\"," +
+                "\"description\":\"Updated product price again\"," +
+                "\"oldValue\":\"1299.00\"," +
+                "\"newValue\":\"1499.00\"," +
+                "\"idempotencyKey\":\"" + idempotencyKey + "\"" +
+                "}" +
+                "]}";
+
+        mockMvc.perform(post("/api/audit-logs/batch")
+                        .header("Authorization", "Bearer " + admin.token())
+                        .header("X-Idempotency-Key", idempotencyKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalProcessed").value(2))
+                .andExpect(jsonPath("$.successCount").value(1))
+                .andExpect(jsonPath("$.duplicateCount").value(1))
+                .andExpect(jsonPath("$.failureCount").value(0));
+
+        mockMvc.perform(get("/api/audit-logs/download")
+                        .header("Authorization", "Bearer " + admin.token()))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Disposition", "attachment; filename=audit-logs.csv"))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.parseMediaType("text/csv")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("entityType")));
     }
 
     private UserSession registerAndLoginCustomer() throws Exception {
