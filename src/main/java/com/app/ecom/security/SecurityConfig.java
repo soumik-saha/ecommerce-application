@@ -61,7 +61,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/products/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/products/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/products/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/orders").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/orders").authenticated()
                         .requestMatchers(HttpMethod.PATCH, "/api/orders/**").hasRole("ADMIN")
                         .requestMatchers("/api/orders/**", "/api/cart/**",
                                 "/api/payments/**", "/api/reviews/**").authenticated()
@@ -112,4 +112,3 @@ public class SecurityConfig {
         return configuration.getAuthenticationManager();
     }
 }
-

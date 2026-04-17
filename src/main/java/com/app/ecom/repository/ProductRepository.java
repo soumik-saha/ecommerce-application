@@ -3,7 +3,9 @@ package com.app.ecom.repository;
 import com.app.ecom.model.Product;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -17,7 +19,14 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     Optional<Product> findByIdAndActiveTrue(Long id);
 
-    @Query("SELECT p FROM com_products p WHERE p.active=true AND p.stockQuantity>0 AND LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%'))")
+    @Query("""
+            SELECT p
+            FROM com_products p
+            WHERE p.active = true
+              AND p.stockQuantity > 0
+              AND (LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                   OR LOWER(p.description) LIKE LOWER(CONCAT('%', :keyword, '%')))
+            """)
     List<Product> searchProducts(@Param("keyword") String keyword);
 
     @Query("""
@@ -25,8 +34,34 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             FROM com_products p
             WHERE p.active = true
               AND p.stockQuantity > 0
-              AND (:keyword = '' OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')))
+              AND (:keyword = '' OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                   OR LOWER(p.description) LIKE LOWER(CONCAT('%', :keyword, '%')))
             """)
     Page<Product> searchActiveProducts(@Param("keyword") String keyword, Pageable pageable);
+
+    @Query("""
+            SELECT p
+            FROM com_products p
+            WHERE p.active = true
+              AND p.stockQuantity > 0
+              AND p.category IN :categories
+            """)
+    Page<Product> findByCategoryIn(@Param("categories") List<String> categories, Pageable pageable);
+
+    @Query("""
+            SELECT p
+            FROM com_products p
+            WHERE p.active = true
+              AND p.stockQuantity > 0
+            """)
+    Page<Product> findActiveProducts(Pageable pageable);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT p
+            FROM com_products p
+            WHERE p.id = :productId AND p.active = true
+            """)
+    Optional<Product> findByIdForUpdate(@Param("productId") Long productId);
 
 }

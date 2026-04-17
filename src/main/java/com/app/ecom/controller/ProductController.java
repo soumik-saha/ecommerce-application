@@ -2,7 +2,9 @@ package com.app.ecom.controller;
 
 import com.app.ecom.dto.ProductRequest;
 import com.app.ecom.dto.ProductResponse;
+import com.app.ecom.dto.ReviewResponse;
 import com.app.ecom.service.ProductService;
+import com.app.ecom.service.ReviewService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -26,6 +28,7 @@ import java.util.List;
 public class ProductController {
 
     private final ProductService productService;
+    private final ReviewService reviewService;
 
     @PostMapping
     public ResponseEntity<ProductResponse> createProduct(@Valid @RequestBody ProductRequest productRequest) {
@@ -54,6 +57,16 @@ public class ProductController {
         return ResponseEntity.ok(productService.getProductResponseById(id));
     }
 
+    @GetMapping("/{id}/reviews")
+    public ResponseEntity<Page<ReviewResponse>> getProductReviews(
+            @PathVariable @Positive(message = "id must be positive") Long id,
+            @RequestParam(defaultValue = "0") @Min(value = 0, message = "page must be 0 or greater") int page,
+            @RequestParam(defaultValue = "10") @Min(value = 1, message = "size must be at least 1")
+            @Max(value = 50, message = "size must be at most 50") int size) {
+        log.info("Fetching reviews for productId={}, page={}, size={}", id, page, size);
+        return ResponseEntity.ok(reviewService.getReviewsByProduct(id, page, size));
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<String> updateProduct(@PathVariable @Positive(message = "id must be positive") Long id,
                                                 @Valid @RequestBody ProductRequest productRequest) {
@@ -75,5 +88,15 @@ public class ProductController {
     public ResponseEntity<List<ProductResponse>> searchProducts(@RequestParam @NotBlank(message = "keyword is required") String keyword) {
         log.info("Product search request received with keyword='{}'", keyword);
         return ResponseEntity.ok(productService.searchProducts(keyword));
+    }
+
+    @GetMapping(value = "/search", params = "q")
+    public ResponseEntity<Page<ProductResponse>> searchProductsPaged(
+            @RequestParam("q") @NotBlank(message = "q is required") String keyword,
+            @RequestParam(defaultValue = "0") @Min(value = 0, message = "page must be 0 or greater") int page,
+            @RequestParam(defaultValue = "10") @Min(value = 1, message = "limit must be at least 1")
+            @Max(value = 100, message = "limit must be at most 100") int limit) {
+        log.info("Product search paged request received with keyword='{}', page={}, limit={}", keyword, page, limit);
+        return ResponseEntity.ok(productService.searchProductsPaged(keyword, page, limit));
     }
 }

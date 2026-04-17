@@ -5,12 +5,18 @@ import com.app.ecom.dto.PaymentResponse;
 import com.app.ecom.exception.ResourceNotFoundException;
 import com.app.ecom.model.Order;
 import com.app.ecom.model.OrderStatus;
+import com.app.ecom.model.NotificationType;
+import com.app.ecom.model.OrderStatusHistory;
 import com.app.ecom.model.Payment;
 import com.app.ecom.model.PaymentStatus;
+import com.app.ecom.model.PaymentStatusHistory;
 import com.app.ecom.model.User;
 import com.app.ecom.repository.OrderRepository;
+import com.app.ecom.repository.OrderStatusHistoryRepository;
 import com.app.ecom.repository.PaymentRepository;
+import com.app.ecom.repository.PaymentStatusHistoryRepository;
 import com.app.ecom.repository.UserRepository;
+import com.app.ecom.service.NotificationService;
 import com.app.ecom.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +31,9 @@ public class DefaultPaymentService implements PaymentService {
     private final PaymentRepository paymentRepository;
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
+    private final OrderStatusHistoryRepository orderStatusHistoryRepository;
+    private final PaymentStatusHistoryRepository paymentStatusHistoryRepository;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -39,7 +48,12 @@ public class DefaultPaymentService implements PaymentService {
         }
 
         if (paymentRepository.findByOrder(order).isPresent()) {
-            throw new IllegalStateException("Payment already initiated for orderId: " + request.getOrderId());
+            throw new IllegalStateException("Payment already exists for orderId: " + request.getOrderId());
+        }
+
+        if (order.getTotalAmount() == null || request.getAmount() == null
+                || order.getTotalAmount().compareTo(request.getAmount()) != 0) {
+            throw new IllegalArgumentException("Payment amount does not match order total");
         }
 
         User user = userRepository.findById(userId)
@@ -52,14 +66,21 @@ public class DefaultPaymentService implements PaymentService {
         payment.setCurrency(request.getCurrency());
         payment.setProvider(request.getProvider());
         payment.setGatewayTransactionId(request.getGatewayTransactionId());
-        payment.setStatus(PaymentStatus.INITIATED);
+        payment.setStatus(PaymentStatus.PENDING);
 
         // Move order to PAYMENT_PENDING so it cannot be modified
         order.setOrderStatus(OrderStatus.PAYMENT_PENDING);
         orderRepository.save(order);
+        orderStatusHistoryRepository.save(buildOrderStatusHistory(order, OrderStatus.PAYMENT_PENDING));
 
         Payment saved = paymentRepository.save(payment);
+        paymentStatusHistoryRepository.save(buildPaymentStatusHistory(saved, saved.getStatus()));
         log.info("Payment created with id={} for orderId={}", saved.getId(), order.getId());
+        notificationService.createNotification(
+                userId,
+                "Payment created (pending) for order " + order.getId(),
+                NotificationType.PAYMENT
+        );
         return mapToResponse(saved);
     }
 
@@ -96,21 +117,44 @@ public class DefaultPaymentService implements PaymentService {
         }
 
         payment.setStatus(resolvedStatus);
+        paymentStatusHistoryRepository.save(buildPaymentStatusHistory(payment, resolvedStatus));
 
         // Sync order status based on payment outcome
         Order order = payment.getOrder();
         if (resolvedStatus == PaymentStatus.SUCCESS) {
             order.setOrderStatus(OrderStatus.PAYMENT_COMPLETED);
+            orderStatusHistoryRepository.save(buildOrderStatusHistory(order, OrderStatus.PAYMENT_COMPLETED));
         } else if (resolvedStatus == PaymentStatus.FAILED) {
             order.setOrderStatus(OrderStatus.PAYMENT_FAILED);
+            orderStatusHistoryRepository.save(buildOrderStatusHistory(order, OrderStatus.PAYMENT_FAILED));
         } else if (resolvedStatus == PaymentStatus.REFUNDED) {
             order.setOrderStatus(OrderStatus.REFUNDED);
+            orderStatusHistoryRepository.save(buildOrderStatusHistory(order, OrderStatus.REFUNDED));
         }
         orderRepository.save(order);
 
         Payment saved = paymentRepository.save(payment);
         log.info("Payment updated to status={} for transactionId={}", resolvedStatus, gatewayTransactionId);
+        notificationService.createNotification(
+                order.getUser().getId(),
+                "Payment status updated to " + resolvedStatus + " for order " + order.getId(),
+                NotificationType.PAYMENT
+        );
         return mapToResponse(saved);
+    }
+
+    private OrderStatusHistory buildOrderStatusHistory(Order order, OrderStatus status) {
+        OrderStatusHistory history = new OrderStatusHistory();
+        history.setOrder(order);
+        history.setStatus(status);
+        return history;
+    }
+
+    private PaymentStatusHistory buildPaymentStatusHistory(Payment payment, PaymentStatus status) {
+        PaymentStatusHistory history = new PaymentStatusHistory();
+        history.setPayment(payment);
+        history.setStatus(status);
+        return history;
     }
 
     private PaymentResponse mapToResponse(Payment payment) {

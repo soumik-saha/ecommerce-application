@@ -107,14 +107,23 @@ public class ProductService {
 
     @Cacheable(value = "productSearch", key = "#keyword")
     public List<ProductResponse> searchProducts(String keyword) {
-        log.info("Searching products with keyword='{}'", keyword);
-        List<Product> productList = productRepository.searchProducts(keyword);
+        String safeKeyword = keyword == null ? "" : keyword.trim();
+        log.info("Searching products with keyword='{}'", safeKeyword);
+        List<Product> productList = productRepository.searchProducts(safeKeyword);
         List<ProductResponse> productResponseList = new ArrayList<>();
         for(Product product : productList) {
             ProductResponse productResponse = mapToProductResponse(product);
             productResponseList.add(productResponse);
         }
         return productResponseList;
+    }
+
+    public Page<ProductResponse> searchProductsPaged(String keyword, int page, int limit) {
+        String safeKeyword = keyword == null ? "" : keyword.trim();
+        log.info("Searching products with pagination keyword='{}', page={}, limit={}", safeKeyword, page, limit);
+        PageRequest pageable = PageRequest.of(page, limit, Sort.by("createdAt").descending());
+        return productRepository.searchActiveProducts(safeKeyword, pageable)
+                .map(this::mapToProductResponse);
     }
 
     public Page<ProductResponse> getProducts(String keyword, int page, int size) {
