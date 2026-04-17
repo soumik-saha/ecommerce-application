@@ -21,26 +21,42 @@ public class PromoCodeService {
 
     private final PromoCodeRepository promoCodeRepository;
 
-    @Transactional(readOnly = true)
-    public PromoApplyResponse validatePromo(String code, BigDecimal orderAmount) {
+    @Transactional
+    public PromoApplyResponse applyPromo(String code, BigDecimal orderAmount) {
         PromoCode promoCode = getValidPromoCode(code);
         return buildResponse(promoCode, orderAmount);
     }
 
     @Transactional
-    public PromoApplyResponse applyPromo(String code, BigDecimal orderAmount) {
-        PromoCode promoCode = getValidPromoCode(code);
+    public PromoApplyResponse consumePromo(String code, BigDecimal orderAmount) {
+        PromoCode promoCode = getValidPromoCodeForUpdate(code);
         PromoApplyResponse response = buildResponse(promoCode, orderAmount);
 
         promoCode.setUsageCount(promoCode.getUsageCount() + 1);
         promoCodeRepository.save(promoCode);
-        log.info("Promo code {} applied. Usage {}/{}", promoCode.getCode(), promoCode.getUsageCount(), promoCode.getUsageLimit());
+        log.info("Promo code {} consumed. Usage {}/{}", promoCode.getCode(), promoCode.getUsageCount(), promoCode.getUsageLimit());
         return response;
     }
 
     private PromoCode getValidPromoCode(String code) {
         String normalized = normalize(code);
         PromoCode promoCode = promoCodeRepository.findById(normalized)
+                .orElseThrow(() -> new ResourceNotFoundException("Promo code not found: " + normalized));
+
+        if (promoCode.getExpiryDate() != null && promoCode.getExpiryDate().isBefore(LocalDateTime.now())) {
+            throw new IllegalStateException("Promo code has expired");
+        }
+
+        if (promoCode.getUsageLimit() != null && promoCode.getUsageLimit() > 0
+                && promoCode.getUsageCount() >= promoCode.getUsageLimit()) {
+            throw new IllegalStateException("Promo code usage limit reached");
+        }
+        return promoCode;
+    }
+
+    private PromoCode getValidPromoCodeForUpdate(String code) {
+        String normalized = normalize(code);
+        PromoCode promoCode = promoCodeRepository.findByCodeForUpdate(normalized)
                 .orElseThrow(() -> new ResourceNotFoundException("Promo code not found: " + normalized));
 
         if (promoCode.getExpiryDate() != null && promoCode.getExpiryDate().isBefore(LocalDateTime.now())) {

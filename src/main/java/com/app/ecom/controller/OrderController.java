@@ -5,6 +5,7 @@ import com.app.ecom.dto.OrderDetailResponse;
 import com.app.ecom.dto.OrderResponse;
 import com.app.ecom.dto.OrderStatusUpdateRequest;
 import com.app.ecom.dto.OrderSummaryResponse;
+import com.app.ecom.model.UserRole;
 import com.app.ecom.security.AppUserDetails;
 import com.app.ecom.service.OrderService;
 import jakarta.validation.Valid;
@@ -63,7 +64,7 @@ public class OrderController {
             @AuthenticationPrincipal AppUserDetails currentUser,
             @PathVariable @Positive(message = "orderId must be positive") Long orderId) {
         log.info("Fetch order detail request received for orderId={} userId={}", orderId, currentUser.getId());
-        boolean isAdmin = "ADMIN".equalsIgnoreCase(currentUser.getRole());
+        boolean isAdmin = UserRole.ADMIN.name().equalsIgnoreCase(currentUser.getRole());
         return ResponseEntity.ok(orderService.getOrderDetail(orderId, currentUser.getId(), isAdmin));
     }
 

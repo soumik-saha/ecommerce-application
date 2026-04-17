@@ -20,7 +20,6 @@ import com.app.ecom.model.OrderStatus;
 import com.app.ecom.model.NotificationType;
 import com.app.ecom.model.OrderStatusHistory;
 import com.app.ecom.model.Payment;
-import com.app.ecom.model.PaymentStatus;
 import com.app.ecom.model.Product;
 import com.app.ecom.model.User;
 import com.app.ecom.repository.OrderRepository;
@@ -131,7 +130,7 @@ public class OrderService {
 
         BigDecimal discountAmount = BigDecimal.ZERO;
         if (request != null && request.getPromoCode() != null && !request.getPromoCode().isBlank()) {
-            PromoApplyResponse promo = promoCodeService.applyPromo(request.getPromoCode(), totalAmount);
+            PromoApplyResponse promo = promoCodeService.consumePromo(request.getPromoCode(), totalAmount);
             discountAmount = promo.getDiscountAmount();
             order.setPromoCode(promo.getCode());
         }
@@ -266,8 +265,7 @@ public class OrderService {
         response.setCreatedAt(order.getCreatedAt());
         response.setShippingAddress(mapAddress(order.getShippingAddress(), order.getUser().getAddress()));
 
-        PaymentStatus paymentStatus = payment != null ? payment.getStatus() : PaymentStatus.PENDING;
-        response.setPaymentStatus(paymentStatus);
+        response.setPaymentStatus(payment != null ? payment.getStatus() : null);
         response.setItems(mapOrderItems(order.getOrderItems()));
         response.setOrderTimeline(mapOrderTimeline(order.getId()));
         response.setPaymentTimeline(mapPaymentTimeline(payment));
