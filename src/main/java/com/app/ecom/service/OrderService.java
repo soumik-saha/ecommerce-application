@@ -97,7 +97,7 @@ public class OrderService {
         // Create Order
         Order order = new Order();
         order.setUser(user);
-        order.setOrderStatus(OrderStatus.CREATED);
+        order.setOrderStatus(OrderStatus.CONFIRMED);
         order.setIdempotencyKey(idempotencyKey);
 
         BigDecimal totalAmount = BigDecimal.ZERO;
@@ -112,12 +112,13 @@ public class OrderService {
 
             totalAmount = totalAmount.add(itemTotal);
             // Always attach a managed Product instance in this transaction.
-            Product managedProduct = productRepository.findByIdAndActiveTrue(productId)
+            Product managedProduct = productRepository.findByIdForUpdate(productId)
                     .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
-            int updated = productRepository.decrementStock(productId, quantity);
-            if (updated == 0) {
+            if (managedProduct.getStockQuantity() < quantity) {
                 throw new InsufficientStockException("Insufficient stock for productId: " + productId);
             }
+            managedProduct.setStockQuantity(managedProduct.getStockQuantity() - quantity);
+            productRepository.save(managedProduct);
 
             OrderItem orderItem = new OrderItem();
             orderItem.setProduct(managedProduct);
@@ -139,10 +140,10 @@ public class OrderService {
         order.setTotalAmount(totalAmount.subtract(discountAmount));
         order.setOrderItems(orderItems);
         order.setShippingAddress(copyAddress(user.getAddress()));
-        order.getStatusHistory().add(buildStatusHistory(order, order.getOrderStatus()));
 
         // Save
         Order savedOrder = orderRepository.save(order);
+        orderStatusHistoryRepository.save(buildStatusHistory(savedOrder, savedOrder.getOrderStatus()));
         log.info("Order persisted with id={} for userId={}", savedOrder.getId(), userId);
         notificationService.createNotification(
                 userId,

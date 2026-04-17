@@ -22,7 +22,7 @@ public class PromoCodeService {
     private final PromoCodeRepository promoCodeRepository;
 
     @Transactional(readOnly = true)
-    public PromoApplyResponse previewPromo(String code, BigDecimal orderAmount) {
+    public PromoApplyResponse validatePromo(String code, BigDecimal orderAmount) {
         PromoCode promoCode = getValidPromoCode(code);
         return buildResponse(promoCode, orderAmount);
     }

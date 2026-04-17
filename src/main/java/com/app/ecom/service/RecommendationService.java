@@ -19,6 +19,7 @@ public class RecommendationService {
 
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
+    private static final int FETCH_MULTIPLIER = 3;
 
     @Transactional(readOnly = true)
     public List<ProductResponse> getRecommendations(Long userId, int limit) {
@@ -29,11 +30,11 @@ public class RecommendationService {
         if (categories != null && !categories.isEmpty()) {
             products = productRepository.findByCategoryIn(categories, pageable).getContent();
         } else {
-            products = productRepository.findActiveProducts(PageRequest.of(0, limit * 3)).getContent();
+            products = productRepository.findActiveProducts(PageRequest.of(0, limit * FETCH_MULTIPLIER)).getContent();
         }
 
         if (products.isEmpty()) {
-            products = productRepository.findActiveProducts(PageRequest.of(0, limit * 3)).getContent();
+            products = productRepository.findActiveProducts(PageRequest.of(0, limit * FETCH_MULTIPLIER)).getContent();
         }
 
         java.util.Collections.shuffle(products);

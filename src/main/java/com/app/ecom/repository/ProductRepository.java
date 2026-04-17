@@ -3,8 +3,9 @@ package com.app.ecom.repository;
 import com.app.ecom.model.Product;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -55,12 +56,12 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             """)
     Page<Product> findActiveProducts(Pageable pageable);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
-            UPDATE com_products p
-            SET p.stockQuantity = p.stockQuantity - :quantity
-            WHERE p.id = :productId AND p.stockQuantity >= :quantity AND p.active = true
+            SELECT p
+            FROM com_products p
+            WHERE p.id = :productId AND p.active = true
             """)
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    int decrementStock(@Param("productId") Long productId, @Param("quantity") Integer quantity);
+    Optional<Product> findByIdForUpdate(@Param("productId") Long productId);
 
 }

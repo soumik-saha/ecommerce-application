@@ -15,7 +15,6 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.Index;
-import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -32,12 +31,6 @@ import java.util.List;
         name = "com_orders",
         indexes = {
                 @Index(name = "idx_orders_user_id", columnList = "user_id")
-        },
-        uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uq_orders_user_idempotency",
-                        columnNames = {"user_id", "idempotency_key"}
-                )
         }
 )
 @Getter

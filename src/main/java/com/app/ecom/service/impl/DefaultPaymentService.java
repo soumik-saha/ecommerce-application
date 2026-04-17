@@ -48,7 +48,7 @@ public class DefaultPaymentService implements PaymentService {
         }
 
         if (paymentRepository.findByOrder(order).isPresent()) {
-            throw new IllegalStateException("Payment already initiated for orderId: " + request.getOrderId());
+            throw new IllegalStateException("Payment already exists for orderId: " + request.getOrderId());
         }
 
         if (order.getTotalAmount() == null || request.getAmount() == null
@@ -78,7 +78,7 @@ public class DefaultPaymentService implements PaymentService {
         log.info("Payment created with id={} for orderId={}", saved.getId(), order.getId());
         notificationService.createNotification(
                 userId,
-                "Payment initiated for order " + order.getId(),
+                "Payment created (pending) for order " + order.getId(),
                 NotificationType.PAYMENT
         );
         return mapToResponse(saved);

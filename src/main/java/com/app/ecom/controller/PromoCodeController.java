@@ -23,6 +23,6 @@ public class PromoCodeController {
     @PostMapping("/apply")
     public ResponseEntity<PromoApplyResponse> applyPromo(@Valid @RequestBody PromoApplyRequest request) {
         log.info("Promo apply request received for code={}", request.getCode());
-        return ResponseEntity.ok(promoCodeService.previewPromo(request.getCode(), request.getOrderAmount()));
+        return ResponseEntity.ok(promoCodeService.validatePromo(request.getCode(), request.getOrderAmount()));
     }
 }
