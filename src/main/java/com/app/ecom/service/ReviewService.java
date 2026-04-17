@@ -6,6 +6,7 @@ import com.app.ecom.exception.ResourceNotFoundException;
 import com.app.ecom.model.Product;
 import com.app.ecom.model.Review;
 import com.app.ecom.model.User;
+import com.app.ecom.repository.OrderRepository;
 import com.app.ecom.repository.ProductRepository;
 import com.app.ecom.repository.ReviewRepository;
 import com.app.ecom.repository.UserRepository;
@@ -25,6 +26,7 @@ public class ReviewService {
     private final ReviewRepository reviewRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final OrderRepository orderRepository;
 
     @Transactional
     public ReviewResponse addReview(Long userId, ReviewRequest request) {
@@ -32,6 +34,10 @@ public class ReviewService {
 
         Product product = productRepository.findByIdAndActiveTrue(request.getProductId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + request.getProductId()));
+
+        if (!orderRepository.hasPurchasedProduct(userId, request.getProductId())) {
+            throw new IllegalStateException("You can only review products you have purchased");
+        }
 
         if (reviewRepository.existsByProductIdAndUserId(request.getProductId(), userId)) {
             throw new IllegalStateException("You have already reviewed this product");

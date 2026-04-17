@@ -2,6 +2,7 @@ package com.app.ecom.controller;
 
 import com.app.ecom.dto.PaymentRequest;
 import com.app.ecom.dto.PaymentResponse;
+import com.app.ecom.dto.PaymentVerificationRequest;
 import com.app.ecom.security.AppUserDetails;
 import com.app.ecom.service.PaymentService;
 import jakarta.validation.Valid;
@@ -33,6 +34,15 @@ public class PaymentController {
                 .body(paymentService.initiatePayment(currentUser.getId(), request));
     }
 
+    @PostMapping("/create")
+    public ResponseEntity<PaymentResponse> createPayment(
+            @AuthenticationPrincipal AppUserDetails currentUser,
+            @Valid @RequestBody PaymentRequest request) {
+        log.info("Create payment request received for userId={}, orderId={}", currentUser.getId(), request.getOrderId());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(paymentService.initiatePayment(currentUser.getId(), request));
+    }
+
     @GetMapping("/orders/{orderId}")
     public ResponseEntity<PaymentResponse> getPaymentByOrder(
             @AuthenticationPrincipal AppUserDetails currentUser,
@@ -52,5 +62,15 @@ public class PaymentController {
             @RequestParam String status) {
         log.info("Gateway callback received for transactionId={}, status={}", transactionId, status);
         return ResponseEntity.ok(paymentService.handleGatewayCallback(transactionId, status));
+    }
+
+    @PostMapping("/verify")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<PaymentResponse> verifyPayment(@Valid @RequestBody PaymentVerificationRequest request) {
+        log.info("Payment verify request received for transactionId={}, status={}",
+                request.getGatewayTransactionId(), request.getStatus());
+        return ResponseEntity.ok(paymentService.handleGatewayCallback(
+                request.getGatewayTransactionId(),
+                request.getStatus()));
     }
 }

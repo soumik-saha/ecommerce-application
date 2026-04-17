@@ -1,15 +1,30 @@
 package com.app.ecom.model;
 
-import jakarta.persistence.*;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import jakarta.persistence.Index;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity(name = "com_products")
+@Table(name = "com_products", indexes = {
+        @Index(name = "idx_products_name", columnList = "name")
+})
 @Data
 @NoArgsConstructor
 public class Product {
@@ -27,6 +42,11 @@ public class Product {
     /** Optimistic locking — prevents concurrent inventory overwrites. */
     @Version
     private Long version;
+
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private List<Review> reviews = new ArrayList<>();
 
     @CreationTimestamp
     private LocalDateTime createdAt;

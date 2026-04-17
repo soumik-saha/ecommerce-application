@@ -334,14 +334,27 @@ GET /api/products?keyword=phone&page=0&size=20
 - **Method:** `GET`
 - **Path:** `/api/products/search`
 - **Auth:** Public
-- **Query params:** `keyword` string, required
+- **Query params:**
+  - `q` string, optional (searches name + description)
+  - `page` integer, optional, default `0`
+  - `limit` integer, optional, default `10`
+  - `keyword` string, optional (legacy exact endpoint)
 - **Success:** `200 OK`
-- **Response:** `List<ProductResponse>`
+- **Response:** `Page<ProductResponse>` when using `q`, otherwise `List<ProductResponse>`
 
 Example:
 ```http
+GET /api/products/search?q=Auto&page=0&limit=10
 GET /api/products/search?keyword=Auto
 ```
+
+### Product reviews
+- **Method:** `GET`
+- **Path:** `/api/products/{id}/reviews`
+- **Auth:** Public
+- **Query params:** `page`, `size`
+- **Success:** `200 OK`
+- **Response:** `Page<ReviewResponse>`
 
 ---
 
@@ -423,6 +436,14 @@ Example:
 - **Method:** `POST`
 - **Path:** `/api/orders`
 - **Auth:** Required
+- **Headers:**
+  - `X-Idempotency-Key` (optional) for safe retries
+- **Body (optional):**
+```json
+{
+  "promoCode": "SUMMER10"
+}
+```
 - **Success:** `201 Created`
 - **Response:** `OrderResponse`
 - **Behavior:**
@@ -430,6 +451,20 @@ Example:
   - Creates order items
   - Persists the order in one transaction
   - Clears cart items after order creation
+
+### List my orders (paged)
+- **Method:** `GET`
+- **Path:** `/api/orders?page=&limit=`
+- **Auth:** Required
+- **Success:** `200 OK`
+- **Response:** `Page<OrderSummaryResponse>`
+
+### Get order details
+- **Method:** `GET`
+- **Path:** `/api/orders/{id}`
+- **Auth:** Required (owner or admin)
+- **Success:** `200 OK`
+- **Response:** `OrderDetailResponse`
 
 ### List all orders
 - **Method:** `GET`
@@ -519,6 +554,124 @@ Example:
   - `size` integer, optional, default `20`
 - **Success:** `200 OK`
 - **Response:** `Page<AuditLog>`
+
+---
+
+## 3.7 Payment APIs
+
+### Create payment
+- **Method:** `POST`
+- **Path:** `/api/payments/create` (alias: `/api/payments`)
+- **Auth:** Required
+- **Body:** `PaymentRequest`
+- **Success:** `201 Created`
+- **Response:** `PaymentResponse`
+
+### Verify payment (gateway callback)
+- **Method:** `POST`
+- **Path:** `/api/payments/verify`
+- **Auth:** Admin only
+- **Body:**
+```json
+{
+  "gatewayTransactionId": "<gateway-id>",
+  "status": "SUCCESS"
+}
+```
+- **Success:** `200 OK`
+- **Response:** `PaymentResponse`
+
+### Get payment by order
+- **Method:** `GET`
+- **Path:** `/api/payments/orders/{orderId}`
+- **Auth:** Required
+- **Success:** `200 OK`
+- **Response:** `PaymentResponse`
+
+---
+
+## 3.8 Promo APIs
+
+### Apply promo code
+- **Method:** `POST`
+- **Path:** `/api/promo/apply`
+- **Auth:** Required
+- **Body:** `PromoApplyRequest`
+- **Success:** `200 OK`
+- **Response:** `PromoApplyResponse`
+
+---
+
+## 3.9 Wishlist APIs
+
+### Add to wishlist
+- **Method:** `POST`
+- **Path:** `/api/wishlist`
+- **Auth:** Required
+- **Body:** `WishlistRequest`
+- **Success:** `201 Created`
+- **Response:** `WishlistResponse`
+
+### Get wishlist
+- **Method:** `GET`
+- **Path:** `/api/wishlist`
+- **Auth:** Required
+- **Success:** `200 OK`
+- **Response:** `List<WishlistResponse>`
+
+### Remove from wishlist
+- **Method:** `DELETE`
+- **Path:** `/api/wishlist/{productId}`
+- **Auth:** Required
+- **Success:** `204 No Content`
+
+---
+
+## 3.10 Recommendation APIs
+
+### Get recommendations
+- **Method:** `GET`
+- **Path:** `/api/recommendations`
+- **Auth:** Required
+- **Success:** `200 OK`
+- **Response:** `List<ProductResponse>`
+
+---
+
+## 3.11 Notification APIs
+
+### Get notifications
+- **Method:** `GET`
+- **Path:** `/api/notifications`
+- **Auth:** Required
+- **Success:** `200 OK`
+- **Response:** `List<NotificationResponse>`
+
+### Mark notification read
+- **Method:** `POST`
+- **Path:** `/api/notifications/read/{id}`
+- **Auth:** Required
+- **Success:** `200 OK`
+- **Response:** `NotificationResponse`
+
+---
+
+## 3.12 Return APIs
+
+### Create return request
+- **Method:** `POST`
+- **Path:** `/api/returns`
+- **Auth:** Required
+- **Body:** `ReturnCreateRequest`
+- **Success:** `201 Created`
+- **Response:** `ReturnResponse`
+
+### Get my returns
+- **Method:** `GET`
+- **Path:** `/api/returns`
+- **Auth:** Required
+- **Success:** `200 OK`
+- **Response:** `List<ReturnResponse>`
 
 ---
 
@@ -651,6 +804,7 @@ Planned modules from the broader architecture vision, but not exposed as control
 | Products | PUT | `/api/products/{id}` | ADMIN |
 | Products | DELETE | `/api/products/{id}` | ADMIN |
 | Products | GET | `/api/products/search` | Public |
+| Products | GET | `/api/products/{id}/reviews` | Public |
 | Users | GET | `/api/users` | Required |
 | Users | POST | `/api/users` | Required |
 | Users | GET | `/api/users/{userId}` | Required |
@@ -659,7 +813,21 @@ Planned modules from the broader architecture vision, but not exposed as control
 | Cart | GET | `/api/cart` | Required |
 | Cart | DELETE | `/api/cart/items/{productId}` | Required |
 | Orders | POST | `/api/orders` | Required |
+| Orders | GET | `/api/orders?page=&limit=` | Required |
+| Orders | GET | `/api/orders/{id}` | Required |
 | Orders | GET | `/api/orders` | ADMIN |
+| Payments | POST | `/api/payments` | Required |
+| Payments | POST | `/api/payments/create` | Required |
+| Payments | POST | `/api/payments/verify` | ADMIN |
+| Promo | POST | `/api/promo/apply` | Required |
+| Wishlist | POST | `/api/wishlist` | Required |
+| Wishlist | GET | `/api/wishlist` | Required |
+| Wishlist | DELETE | `/api/wishlist/{productId}` | Required |
+| Recommendations | GET | `/api/recommendations` | Required |
+| Notifications | GET | `/api/notifications` | Required |
+| Notifications | POST | `/api/notifications/read/{id}` | Required |
+| Returns | POST | `/api/returns` | Required |
+| Returns | GET | `/api/returns` | Required |
 | Audit Logs | POST | `/api/audit-logs/batch` | Required |
 | Audit Logs | GET | `/api/audit-logs/user/{userId}` | Required |
 | Audit Logs | GET | `/api/audit-logs/entity/{entityType}/{entityId}` | Required |
@@ -675,4 +843,3 @@ If you want, the next best code change is to add:
 - async batch processing with validation and chunked persistence
 
 That would let you upload large datasets safely without hand-writing SQL.
-
